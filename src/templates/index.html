@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Similarity Checker using CLIP</title>
+</head>
+<body>
+    <h1>Image Similarity Checker using CLIP</h1>
+    <form method="post" action="/check-similarity/" enctype="multipart/form-data">
+        <label for="file1">Upload First Image:</label>
+        <input type="file" name="file1" accept=".jpg, .png, .jpeg" required><br>
+        <label for="file2">Upload Second Image:</label>
+        <input type="file" name="file2" accept=".jpg, .png, .jpeg" required><br>
+        <label for="threshold">Select Similarity Threshold:</label>
+        <input type="number" name="threshold" step="0.01" min="0.0" max="1.0" value="0.7" required><br>
+        <input type="submit" value="Check Similarity">
+    </form>
+    <div>
+        {% if response %}
+            <h2>Similarity Result:</h2>
+            <p>Similarity Score: {{ response.similarity_score }}</p>
+            <p>Threshold: {{ response.threshold }}</p>
+            <p>
+                {% if response.similar %}
+                    The images are similar based on the selected threshold.
+                {% else %}
+                    The images are not similar based on the selected threshold.
+                {% endif %}
+            </p>
+        {% endif %}
+    </div>
+</body>
+</html>
