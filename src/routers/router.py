@@ -299,9 +299,9 @@ async def identify_locations(sentence_input: SentenceInput):
         locations = extract_locations(sentence)
         if locations:
             identified_locations = []
-            st.write("Locations identified in the sentence:")
+            #st.write("Locations identified in the sentence:")
             for location in locations:
-                st.write(location)
+                #st.write(location)
                 identified_locations.append(location)
                 response_data = {}
             for i in identified_locations:
@@ -322,7 +322,7 @@ async def identify_locations(sentence_input: SentenceInput):
 model = SentenceTransformer('clip-ViT-B-32')
 
 
-PAYLOAD_PATH = Path("D:/AI/backend/src/payloads")
+PAYLOAD_PATH = Path(r"C:\Ai-product\ai-backend\src\payloads")
 ANN_INDEX_PATH = PAYLOAD_PATH / "models/ann.ann"
 TRAIN_INDEX_FILEPATH = PAYLOAD_PATH / "metadata/train_index.json"
 EMBEDDING_SIZE = 512
