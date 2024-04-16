@@ -392,6 +392,17 @@ async def predict(image: UploadFile = File(...)):
                 nearest_neighbors=nearest_neighbors, 
                 reference_data=reference_data
                 )
-    
-    return {"class": ann_class_label, "scores": scores[0]}
+    import pandas as pd
+    data = pd.read_csv("C:\\Ai-product\\ai-backend\\src\\payloads\\locations\\7Wonders.csv")
+    #This function gets the lang and longitude for the output we get
+    def get_lat_long(landmark_name):
+        landmark = data[data['Name'].str.lower() == landmark_name.lower()]
+        if not landmark.empty:
+            return landmark.iloc[0]['Latitude'], landmark.iloc[0]['Longitude']
+        else:
+            return None
+    lat_long=get_lat_long(ann_class_label)
+    print(lat_long[0],lat_long[1])
+    ann_class_label=ann_class_label.replace('_', ' ')
+    return {"class": ann_class_label, "scores": scores[0],"latitude":lat_long[0],"longitude":lat_long[1]}
 
