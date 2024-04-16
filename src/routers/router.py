@@ -27,6 +27,14 @@ from src import get_ann_pred, get_sim_image, load_index, load_json
 from pathlib import Path
 from src import FAISStype, analyze_sentiment, get_text_chunks, get_vectorstore
 from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Query
+import sqlite3
+import pandas as pd
+from .openai_nl2sql_class import openai_nl2sql
+from .bard_class_v1 import bardflanllm
+from .llama2_class_v1 import llama_nl2sql
+from .gemini_class_v1 import Geminillm
+
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -394,6 +402,7 @@ async def predict(image: UploadFile = File(...)):
                 )
     import pandas as pd
     data = pd.read_csv("C:\\Ai-product\\ai-backend\\src\\payloads\\locations\\7Wonders.csv")
+    
     #This function gets the lang and longitude for the output we get
     def get_lat_long(landmark_name):
         landmark = data[data['Name'].str.lower() == landmark_name.lower()]
@@ -406,3 +415,200 @@ async def predict(image: UploadFile = File(...)):
     ann_class_label=ann_class_label.replace('_', ' ')
     return {"class": ann_class_label, "scores": scores[0],"latitude":lat_long[0],"longitude":lat_long[1]}
 
+
+
+
+
+
+
+
+
+
+json_data = {
+    "Collections": [
+        {
+  "tables": [
+    {
+      "name": "employees",
+      "columns": [
+        {"name": "employee_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "age", "type": "int"},
+        {"name": "department_id", "type": "int", "foreign_key": {"table": "departments", "column": "department_id"}},
+        {"name": "salary", "type": "decimal(10, 2)"},
+        {"name": "hire_date", "type": "date"},
+        {"name": "email", "type": "varchar(255)"}
+      ]
+    },
+    {
+      "name": "departments",
+      "columns": [
+        {"name": "department_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "location", "type": "varchar(255)"},
+        {"name": "manager_id", "type": "int", "foreign_key": {"table": "employees", "column": "employee_id"}}
+      ]
+    },
+    {
+      "name": "projects",
+      "columns": [
+        {"name": "project_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "start_date", "type": "date"},
+        {"name": "end_date", "type": "date"},
+        {"name": "department_id", "type": "int", "foreign_key": {"table": "departments", "column": "department_id"}},
+        {"name": "budget", "type": "decimal(15, 2)"},
+        {"name": "status", "type": "varchar(50)"}
+      ]
+    },
+    {
+      "name": "tasks",
+      "columns": [
+        {"name": "task_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "description", "type": "text"},
+        {"name": "start_date", "type": "date"},
+        {"name": "end_date", "type": "date"},
+        {"name": "project_id", "type": "int", "foreign_key": {"table": "projects", "column": "project_id"}},
+        {"name": "assigned_to", "type": "int", "foreign_key": {"table": "employees", "column": "employee_id"}}
+      ]
+    },
+    {
+      "name": "customers",
+      "columns": [
+        {"name": "customer_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "email", "type": "varchar(255)"},
+        {"name": "phone", "type": "varchar(20)"},
+        {"name": "address", "type": "varchar(255)"},
+        {"name": "city", "type": "varchar(100)"},
+        {"name": "country", "type": "varchar(100)"}
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {"name": "order_id", "type": "int", "primary_key": True},
+        {"name": "order_date", "type": "date"},
+        {"name": "customer_id", "type": "int", "foreign_key": {"table": "customers", "column": "customer_id"}},
+        {"name": "total_amount", "type": "decimal(15, 2)"},
+        {"name": "status", "type": "varchar(50)"},
+        {"name": "delivery_address", "type": "varchar(255)"},
+        {"name": "delivery_date", "type": "date"}
+      ]
+    },
+    {
+      "name": "products",
+      "columns": [
+        {"name": "product_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "description", "type": "text"},
+        {"name": "price", "type": "decimal(10, 2)"},
+        {"name": "stock_quantity", "type": "int"},
+        {"name": "supplier_id", "type": "int", "foreign_key": {"table": "suppliers", "column": "supplier_id"}},
+        {"name": "category_id", "type": "int", "foreign_key": {"table": "categories", "column": "category_id"}}
+      ]
+    },
+    {
+      "name": "suppliers",
+      "columns": [
+        {"name": "supplier_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "contact_person", "type": "varchar(100)"},
+        {"name": "email", "type": "varchar(255)"},
+        {"name": "phone", "type": "varchar(20)"},
+        {"name": "address", "type": "varchar(255)"},
+        {"name": "city", "type": "varchar(100)"}
+      ]
+    },
+    {
+      "name": "categories",
+      "columns": [
+        {"name": "category_id", "type": "int", "primary_key": True},
+        {"name": "name", "type": "varchar(100)"},
+        {"name": "description", "type": "text"},
+        {"name": "parent_category_id", "type": "int", "foreign_key": {"table": "categories", "column": "category_id"}}
+      ]
+    },
+    {
+      "name": "payments",
+      "columns": [
+        {"name": "payment_id", "type": "int", "primary_key": True},
+        {"name": "order_id", "type": "int", "foreign_key": {"table": "orders", "column": "order_id"}},
+        {"name": "payment_date", "type": "date"},
+        {"name": "amount", "type": "decimal(15, 2)"},
+        {"name": "payment_method", "type": "varchar(50)"},
+        {"name": "status", "type": "varchar(50)"},
+        {"name": "confirmation_number", "type": "varchar(100)"}
+      ]
+    }
+  ]
+}
+
+    ]
+      
+}
+
+
+
+# Function to execute SQL queries
+def execute_query(sql_query):
+    conn = sqlite3.connect(r'C:\Ai-product\ai-backend\src\routers\employee.db')
+    cur = conn.cursor()
+    try:
+        cur.execute(sql_query)
+        rows = cur.fetchall()
+        return rows, cur.description
+    except Exception as e:
+        print(e)
+        return None, None # Return the exception instead of None
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+# query="Retrieve the name and contact details of all suppliers who have not provided any products yet."
+# model=bard
+@router.get("/sql_query/")
+async def get_sql_query(query: str, model: str):
+    user_query = query
+    model_selection = model
+    
+    if model_selection == "open_ai":
+        obj = openai_nl2sql()
+    elif model_selection == "flan":
+        obj = bardflanllm("flan")
+    elif model_selection == "llama2":
+        obj = llama_nl2sql()
+    elif model_selection == "bard":
+        obj = bardflanllm("bard")
+    elif model_selection == "gemini":
+        obj = Geminillm("gemini")
+    else:
+        return {"message": "Invalid model selection"}
+
+    if obj:
+        # Translate the query
+        result = obj.start_process(json_data, user_query)
+        print("result: ",result)
+        # Sanitize the result to ensure it only contains valid SQL query
+        if result and isinstance(result, str):
+            # Strip any non-SQL content such as markdown backticks
+            clean_result = result.replace('```', '').strip()
+            clean_result = clean_result.replace('sql', '').strip()
+            print("clear_result: ",clean_result)
+            # Execute the SQL query and return results
+            query_result, description = execute_query(clean_result)
+            
+            print("query: ",query_result)
+            
+            if query_result and description:
+                df = pd.DataFrame(query_result, columns=[column[0] for column in description])
+                return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
+            else:
+                return {"message": "No data found or query error."}
+        else:
+            return {"message": "Failed to translate query."}
+    else:
+        return {"message": "No LLM model selected"}
