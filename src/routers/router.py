@@ -623,7 +623,7 @@ async def get_sql_query(
     query: str,
     model: str,
     json_input: UploadFile = File(None),
-    language: str = "Sql"
+    language: str = "SQL"
 ):
     user_query = query
     model_selection = model
@@ -770,15 +770,15 @@ async def get_sql_query(
             
         }
 
-    if model_selection == "open_ai":
+    if model_selection.lower() == "open_ai":
         obj = openai_nl2sql()
-    elif model_selection == "flan":
+    elif model_selection.lower() == "flan":
         obj = bardflanllm("flan")
-    elif model_selection == "llama2":
+    elif model_selection.lower() == "llama2":
         obj = llama_nl2sql()
-    elif model_selection == "bard":
+    elif model_selection.lower() == "bard":
         obj = bardflanllm("bard")
-    elif model_selection == "gemini":
+    elif model_selection.lower() == "gemini":
         obj = Geminillm("gemini")
     else:
         return {"message": "Invalid model selection"}
@@ -807,3 +807,35 @@ async def get_sql_query(
             return {"message": "Failed to translate query."}
     else:
         return {"message": "No LLM model selected"}
+  
+    
+from fastapi.responses import StreamingResponse
+from PIL import Image
+from io import BytesIO
+
+
+# Define your endpoint
+@router.get("/get_image")
+async def get_image():
+    # Load your image from file or from somewhere else
+    try:
+        # Open the image
+        with open(r"C:\Ai-product\ai-backend\src\routers\Img\schema.png", "rb") as f:
+            image_bytes = f.read()
+
+        # You can process the image if necessary
+        # For example, resizing it
+        img = Image.open(BytesIO(image_bytes))
+        img_resized = img.resize((200, 200))  # Resize to 200x200 pixels
+
+        # Convert the image back to bytes
+        with BytesIO() as output:
+            img_resized.save(output, format="PNG")
+            image_bytes_resized = output.getvalue()
+
+        # Return the image bytes as a streaming response
+        return StreamingResponse(BytesIO(image_bytes_resized), media_type="image/png")
+
+    except Exception as e:
+        # If something goes wrong, return an error
+        raise HTTPException(status_code=500, detail=str(e))
