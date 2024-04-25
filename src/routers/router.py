@@ -550,6 +550,53 @@ json_data = {
 }
 
 
+# # query="Retrieve the name and contact details of all suppliers who have not provided any products yet."
+# # model=bard
+# @router.get("/sql_query/")
+# async def get_sql_query(query: str, model: str):
+#     user_query = query
+#     model_selection = model
+    
+#     if model_selection == "open_ai":
+#         obj = openai_nl2sql()
+#     elif model_selection == "flan":
+#         obj = bardflanllm("flan")
+#     elif model_selection == "llama2":
+#         obj = llama_nl2sql()
+#     elif model_selection == "bard":
+#         obj = bardflanllm("bard")
+#     elif model_selection == "gemini":
+#         obj = Geminillm("gemini")
+#     else:
+#         return {"message": "Invalid model selection"}
+
+#     if obj:
+#         # Translate the query
+#         result = obj.start_process(json_data, user_query)
+#         print("result: ",result)
+#         # Sanitize the result to ensure it only contains valid SQL query
+#         if result and isinstance(result, str):
+#             # Strip any non-SQL content such as markdown backticks
+#             clean_result = result.replace('```', '').strip()
+#             clean_result = clean_result.replace('sql', '').strip()
+#             print("clear_result: ",clean_result)
+#             # Execute the SQL query and return results
+#             query_result, description = execute_query(clean_result)
+            
+#             print("query: ",query_result)
+            
+#             if query_result and description:
+#                 df = pd.DataFrame(query_result, columns=[column[0] for column in description])
+#                 return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
+#             else:
+#                 return {"message": "No data found or query error."}
+#         else:
+#             return {"message": "Failed to translate query."}
+#     else:
+#         return {"message": "No LLM model selected"}
+
+
+
 
 # Function to execute SQL queries
 def execute_query(sql_query):
@@ -567,14 +614,30 @@ def execute_query(sql_query):
         conn.close()
 
 
-
-# query="Retrieve the name and contact details of all suppliers who have not provided any products yet."
-# model=bard
-@router.get("/sql_query/")
-async def get_sql_query(query: str, model: str):
-    user_query = query
-    model_selection = model
+obj = None
+json_data = None
+user_query = None
+model_selection = None    
     
+import json
+    
+@router.post("/sql_query/")
+async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = None, uploaded_file: UploadFile = File(None)):
+    global obj, json_data
+
+    if uploaded_file is not None:
+        schema_option = "upload new schema"
+
+    if schema_option == "default":
+        with open("default_schema.json") as file:
+            json_data = json.load(file)
+    elif schema_option == "upload new schema":
+        if uploaded_file is None:
+            raise HTTPException(status_code=400, detail="JSON file upload required for new schema")
+        json_data = json.loads(uploaded_file.file.read())
+    else:
+        raise HTTPException(status_code=400, detail="Invalid schema option")
+
     if model_selection == "open_ai":
         obj = openai_nl2sql()
     elif model_selection == "flan":
@@ -586,228 +649,24 @@ async def get_sql_query(query: str, model: str):
     elif model_selection == "gemini":
         obj = Geminillm("gemini")
     else:
-        return {"message": "Invalid model selection"}
+        raise HTTPException(status_code=400, detail="Invalid model selection")
 
-    if obj:
-        # Translate the query
-        result = obj.start_process(json_data, user_query)
-        print("result: ",result)
-        # Sanitize the result to ensure it only contains valid SQL query
-        if result and isinstance(result, str):
-            # Strip any non-SQL content such as markdown backticks
-            clean_result = result.replace('```', '').strip()
-            clean_result = clean_result.replace('sql', '').strip()
-            print("clear_result: ",clean_result)
+    # Translate the query
+    result = obj.start_process(json_data, user_query)
+    if result and isinstance(result, str):
+        clean_result = result.replace('```', '').strip().replace('sql', '').strip()
+        if schema_option == "default":
             # Execute the SQL query and return results
             query_result, description = execute_query(clean_result)
-            
-            print("query: ",query_result)
-            
             if query_result and description:
                 df = pd.DataFrame(query_result, columns=[column[0] for column in description])
                 return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
             else:
-                return {"message": "No data found or query error."}
+                return {"sql_query": clean_result, "result": "No data found or query error."}
         else:
-            return {"message": "Failed to translate query."}
+            return {"sql_query": clean_result}
     else:
-        return {"message": "No LLM model selected"}
-    
-    
-    
-import json  
-from typing import Union
-    
-@router.post("/sql_query/")
-async def get_sql_query(
-    query: str,
-    model: str,
-    json_input: UploadFile = File(None),
-    language: str = "SQL"
-):
-    user_query = query
-    model_selection = model
-    json_data = None  # Initialize json_data as None
-    
-    # If json_input is provided, use the uploaded JSON data
-    if json_input:
-        try:
-            # Process uploaded JSON file
-            json_content = await json_input.read()
-            # Convert bytes to string
-            json_content = json_content.decode("utf-8")
-            #print(json_content)
-            json_data = json_content
-            print("Uploaded JSON content:", json_data)
-        except UnicodeDecodeError as e:
-            print("Error decoding JSON content:", e)
-
-    # If json_data is not provided, use the default one
-    if not json_data:
-        
-        json_data = {
-            "Collections": [
-                {
-        "tables": [
-            {
-            "name": "employees",
-            "columns": [
-                {"name": "employee_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "age", "type": "int"},
-                {"name": "department_id", "type": "int", "foreign_key": {"table": "departments", "column": "department_id"}},
-                {"name": "salary", "type": "decimal(10, 2)"},
-                {"name": "hire_date", "type": "date"},
-                {"name": "email", "type": "varchar(255)"}
-            ]
-            },
-            {
-            "name": "departments",
-            "columns": [
-                {"name": "department_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "location", "type": "varchar(255)"},
-                {"name": "manager_id", "type": "int", "foreign_key": {"table": "employees", "column": "employee_id"}}
-            ]
-            },
-            {
-            "name": "projects",
-            "columns": [
-                {"name": "project_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "start_date", "type": "date"},
-                {"name": "end_date", "type": "date"},
-                {"name": "department_id", "type": "int", "foreign_key": {"table": "departments", "column": "department_id"}},
-                {"name": "budget", "type": "decimal(15, 2)"},
-                {"name": "status", "type": "varchar(50)"}
-            ]
-            },
-            {
-            "name": "tasks",
-            "columns": [
-                {"name": "task_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "description", "type": "text"},
-                {"name": "start_date", "type": "date"},
-                {"name": "end_date", "type": "date"},
-                {"name": "project_id", "type": "int", "foreign_key": {"table": "projects", "column": "project_id"}},
-                {"name": "assigned_to", "type": "int", "foreign_key": {"table": "employees", "column": "employee_id"}}
-            ]
-            },
-            {
-            "name": "customers",
-            "columns": [
-                {"name": "customer_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "email", "type": "varchar(255)"},
-                {"name": "phone", "type": "varchar(20)"},
-                {"name": "address", "type": "varchar(255)"},
-                {"name": "city", "type": "varchar(100)"},
-                {"name": "country", "type": "varchar(100)"}
-            ]
-            },
-            {
-            "name": "orders",
-            "columns": [
-                {"name": "order_id", "type": "int", "primary_key": True},
-                {"name": "order_date", "type": "date"},
-                {"name": "customer_id", "type": "int", "foreign_key": {"table": "customers", "column": "customer_id"}},
-                {"name": "total_amount", "type": "decimal(15, 2)"},
-                {"name": "status", "type": "varchar(50)"},
-                {"name": "delivery_address", "type": "varchar(255)"},
-                {"name": "delivery_date", "type": "date"}
-            ]
-            },
-            {
-            "name": "products",
-            "columns": [
-                {"name": "product_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "description", "type": "text"},
-                {"name": "price", "type": "decimal(10, 2)"},
-                {"name": "stock_quantity", "type": "int"},
-                {"name": "supplier_id", "type": "int", "foreign_key": {"table": "suppliers", "column": "supplier_id"}},
-                {"name": "category_id", "type": "int", "foreign_key": {"table": "categories", "column": "category_id"}}
-            ]
-            },
-            {
-            "name": "suppliers",
-            "columns": [
-                {"name": "supplier_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "contact_person", "type": "varchar(100)"},
-                {"name": "email", "type": "varchar(255)"},
-                {"name": "phone", "type": "varchar(20)"},
-                {"name": "address", "type": "varchar(255)"},
-                {"name": "city", "type": "varchar(100)"}
-            ]
-            },
-            {
-            "name": "categories",
-            "columns": [
-                {"name": "category_id", "type": "int", "primary_key": True},
-                {"name": "name", "type": "varchar(100)"},
-                {"name": "description", "type": "text"},
-                {"name": "parent_category_id", "type": "int", "foreign_key": {"table": "categories", "column": "category_id"}}
-            ]
-            },
-            {
-            "name": "payments",
-            "columns": [
-                {"name": "payment_id", "type": "int", "primary_key": True},
-                {"name": "order_id", "type": "int", "foreign_key": {"table": "orders", "column": "order_id"}},
-                {"name": "payment_date", "type": "date"},
-                {"name": "amount", "type": "decimal(15, 2)"},
-                {"name": "payment_method", "type": "varchar(50)"},
-                {"name": "status", "type": "varchar(50)"},
-                {"name": "confirmation_number", "type": "varchar(100)"}
-            ]
-            }
-        ]
-        }
-
-            ]
-            
-        }
-
-    if model_selection.lower() == "open_ai":
-        obj = openai_nl2sql()
-    elif model_selection.lower() == "flan":
-        obj = bardflanllm("flan")
-    elif model_selection.lower() == "llama2":
-        obj = llama_nl2sql()
-    elif model_selection.lower() == "bard":
-        obj = bardflanllm("bard")
-    elif model_selection.lower() == "gemini":
-        obj = Geminillm("gemini")
-    else:
-        return {"message": "Invalid model selection"}
-
-    if obj:
-        # Translate the query
-        result = obj.start_process(json_data, user_query)
-        print("result: ", result)
-        # Sanitize the result to ensure it only contains valid SQL query
-        if result and isinstance(result, str):
-            # Strip any non-SQL content such as markdown backticks
-            clean_result = result.replace('```', '').strip()
-            clean_result = clean_result.replace('sql', '').strip()
-            print("clear_result: ", clean_result)
-            # Execute the SQL query and return results
-            query_result, description = execute_query(clean_result)
-
-            print("query: ", query_result)
-
-            if query_result and description:
-                df = pd.DataFrame(query_result, columns=[column[0] for column in description])
-                return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
-            else:
-                return {"message": "No data found or query error."}
-        else:
-            return {"message": "Failed to translate query."}
-    else:
-        return {"message": "No LLM model selected"}
-  
+        raise HTTPException(status_code=500, detail="Error translating query")
     
 from fastapi.responses import StreamingResponse
 from PIL import Image
@@ -839,3 +698,14 @@ async def get_image():
     except Exception as e:
         # If something goes wrong, return an error
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@router.post("/clear_all/")
+async def clear_all():
+    global obj, json_data, user_query, model_selection
+    obj = None
+    json_data = None
+    user_query = None
+    model_selection = None
+    return {"message": "All values cleared"}

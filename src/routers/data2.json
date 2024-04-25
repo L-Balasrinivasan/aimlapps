@@ -1,0 +1,39 @@
+{
+    "Collections": [
+      {
+        "tables": [
+          {
+            "name": "users",
+            "columns": [
+              {"name": "user_id", "type": "int", "primary_key": true},
+              {"name": "username", "type": "varchar(50)", "unique": true},
+              {"name": "password", "type": "varchar(255)"},
+              {"name": "email", "type": "varchar(100)", "unique": true},
+              {"name": "created_at", "type": "datetime"}
+            ]
+          },
+          {
+            "name": "posts",
+            "columns": [
+              {"name": "post_id", "type": "int", "primary_key": true},
+              {"name": "title", "type": "varchar(255)"},
+              {"name": "content", "type": "text"},
+              {"name": "author_id", "type": "int", "foreign_key": {"table": "users", "column": "user_id"}},
+              {"name": "created_at", "type": "datetime"}
+            ]
+          },
+          {
+            "name": "comments",
+            "columns": [
+              {"name": "comment_id", "type": "int", "primary_key": true},
+              {"name": "content", "type": "text"},
+              {"name": "post_id", "type": "int", "foreign_key": {"table": "posts", "column": "post_id"}},
+              {"name": "author_id", "type": "int", "foreign_key": {"table": "users", "column": "user_id"}},
+              {"name": "created_at", "type": "datetime"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  
