@@ -622,7 +622,7 @@ model_selection = None
 import json
     
 @router.post("/sql_query/")
-async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = None, uploaded_file: UploadFile = File(None)):
+async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = None, uploaded_file: UploadFile = File(None),language: str = "SQL"):
     global obj, json_data
 
     if uploaded_file is not None:
