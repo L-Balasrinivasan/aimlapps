@@ -634,7 +634,10 @@ async def get_sql_query(schema_option: str = None, user_query: str = None, model
     elif schema_option == "upload new schema":
         if uploaded_file is None:
             raise HTTPException(status_code=400, detail="JSON file upload required for new schema")
-        json_data = json.loads(uploaded_file.file.read())
+        try:
+            json_data = json.loads(uploaded_file.file.read())
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON file format")
     else:
         raise HTTPException(status_code=400, detail="Invalid schema option")
 
