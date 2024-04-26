@@ -618,12 +618,16 @@ obj = None
 json_data = None
 user_query = None
 model_selection = None    
-    
+language = None
+row_limit = None
+
+
 import json
     
 @router.post("/sql_query/")
-async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = None, uploaded_file: UploadFile = File(None),language: str = "SQL"):
+async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = "bard", uploaded_file: UploadFile = File(None),language: str = "SQL",row_limit: int=100):
     global obj, json_data
+    # ,user_query,model_selection,language, row_limit
 
     if uploaded_file is not None:
         schema_option = "upload new schema"
@@ -655,10 +659,20 @@ async def get_sql_query(schema_option: str = None, user_query: str = None, model
         raise HTTPException(status_code=400, detail="Invalid model selection")
 
     # Translate the query
-    result = obj.start_process(json_data, user_query)
+    result = obj.start_process(json_data, user_query,language)
     if result and isinstance(result, str):
-        clean_result = result.replace('```', '').strip().replace('sql', '').strip()
-        if schema_option == "default":
+        
+        # Strip any non-QL content such as markdown backticks
+        clean_result = result.replace('```', '').strip()
+        lower_version_query_language = language.lower()
+        clean_result = clean_result.replace(lower_version_query_language, '').strip()
+        clean_result = clean_result.replace(";", "")
+        if row_limit == "":
+            default_row_limit=100
+            clean_result = clean_result + " LIMIT " + str(default_row_limit)
+        else:
+            clean_result = clean_result + " LIMIT " + str(row_limit)
+        if schema_option == "default" and language == "SQL":
             # Execute the SQL query and return results
             query_result, description = execute_query(clean_result)
             if query_result and description:
@@ -706,9 +720,11 @@ async def get_image():
 
 @router.post("/clear_all/")
 async def clear_all():
-    global obj, json_data, user_query, model_selection
+    global obj, json_data, user_query, model_selection, language, row_limit
     obj = None
     json_data = None
     user_query = None
     model_selection = None
+    language = None
+    row_limit = None
     return {"message": "All values cleared"}

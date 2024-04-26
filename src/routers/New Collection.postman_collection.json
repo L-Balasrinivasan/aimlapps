@@ -1,0 +1,232 @@
+{
+	"info": {
+		"_postman_id": "f64b542a-4c0b-445c-80f3-b5a5c9aefab0",
+		"name": "New Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "33735274",
+		"_collection_link": "https://ai5555.postman.co/workspace/ai-Workspace~e04264cb-bb4b-49b2-99aa-73e3b05c3faf/collection/33735274-f64b542a-4c0b-445c-80f3-b5a5c9aefab0?action=share&source=collection_link&creator=33735274"
+	},
+	"item": [
+		{
+			"name": "127.0.0.1:8000/ai/sql_query?query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model=bard&language=SQl",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "query",
+							"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet.",
+							"type": "text"
+						},
+						{
+							"key": "model",
+							"value": "bard",
+							"type": "text"
+						},
+						{
+							"key": "language",
+							"value": "SQL",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "127.0.0.1:8000/ai/sql_query?query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model=bard&language=SQl",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"ai",
+						"sql_query"
+					],
+					"query": [
+						{
+							"key": "query",
+							"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet."
+						},
+						{
+							"key": "model",
+							"value": "bard"
+						},
+						{
+							"key": "language",
+							"value": "SQl"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://10.0.0.111:8000/ai/sql_query?query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model=bard&language=SQL",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "schema_option",
+							"value": "",
+							"type": "text"
+						},
+						{
+							"key": "user_query",
+							"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet.",
+							"type": "text"
+						},
+						{
+							"key": "model_selection",
+							"value": "bard",
+							"type": "text"
+						},
+						{
+							"key": "language",
+							"value": "SQl",
+							"type": "text"
+						},
+						{
+							"key": "Uploaded_file",
+							"type": "file",
+							"src": "/C:/Ai-product/ai-backend/src/routers/data2.json"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/ai/sql_query?schema_option=default&user_query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model_selection=bard&language=SQL",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"ai",
+						"sql_query"
+					],
+					"query": [
+						{
+							"key": "schema_option",
+							"value": "default"
+						},
+						{
+							"key": "user_query",
+							"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet."
+						},
+						{
+							"key": "model_selection",
+							"value": "bard"
+						},
+						{
+							"key": "language",
+							"value": "SQL"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "http://10.0.0.111:8000/ai/sql_query?query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model=bard&language=SQL",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "schema_option",
+									"value": "",
+									"type": "text"
+								},
+								{
+									"key": "user_query",
+									"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet.",
+									"type": "text"
+								},
+								{
+									"key": "model_selection",
+									"value": "bard",
+									"type": "text"
+								},
+								{
+									"key": "language",
+									"value": "SQl",
+									"type": "text"
+								},
+								{
+									"key": "Uploaded_file",
+									"type": "file",
+									"src": "/C:/Ai-product/ai-backend/src/routers/data2.json"
+								}
+							]
+						},
+						"url": {
+							"raw": "http://127.0.0.1:8000/ai/sql_query?schema_option=default&user_query=Retrieve the name and contact details of all suppliers who have not provided any products yet.&model_selection=bard&language=SQL",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"ai",
+								"sql_query"
+							],
+							"query": [
+								{
+									"key": "schema_option",
+									"value": "default"
+								},
+								{
+									"key": "user_query",
+									"value": "Retrieve the name and contact details of all suppliers who have not provided any products yet."
+								},
+								{
+									"key": "model_selection",
+									"value": "bard"
+								},
+								{
+									"key": "language",
+									"value": "SQL"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "date",
+							"value": "Thu, 25 Apr 2024 11:42:33 GMT"
+						},
+						{
+							"key": "server",
+							"value": "uvicorn"
+						},
+						{
+							"key": "content-length",
+							"value": "368"
+						},
+						{
+							"key": "content-type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"sql_query\": \"SELECT \\n  s.name,\\n  s.contact_person,\\n  s.email,\\n  s.phone,\\n  s.address,\\n  s.city\\nFROM suppliers AS s\\nLEFT JOIN products AS p ON s.supplier_id = p.supplier_id\\nWHERE p.product_id IS NULL\",\n    \"result\": [\n        {\n            \"name\": \"GadgetMart\",\n            \"contact_person\": \"Jim Beam\",\n            \"email\": \"jimbeam@example.com\",\n            \"phone\": \"555-9080\",\n            \"address\": \"789 Gadget Ave\",\n            \"city\": \"Gadgetville\"\n        }\n    ]\n}"
+				}
+			]
+		}
+	]
+}

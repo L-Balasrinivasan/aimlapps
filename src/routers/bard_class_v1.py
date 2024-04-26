@@ -1,5 +1,5 @@
 # import google.generativeai as palm
-# from langchain.llms import CTransformers
+from langchain.llms import CTransformers
 from langchain.chains import LLMChain
 from langchain import PromptTemplate
 import typing as t
@@ -8,11 +8,12 @@ import json
 import os
 from langchain.llms import HuggingFaceHub
 from langchain.prompts import PromptTemplate
-#from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.output_parser import StrOutputParser
 from dotenv import load_dotenv
 import json
 from pathlib import Path
 from langchain.llms import GooglePalm
+import google.generativeai as genai
 import time
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -26,6 +27,7 @@ class bardflanllm:
             print("selected Bard as the LLM Model")
             os.environ["GOOGLE_API_KEY"] = "AIzaSyA2FmPI7w_LnhIE1Q2qr0W7n9qBCCzSlXM"
             self.llm = GooglePalm(temperature=0)
+        
         if llm_model == "flan":
             print("selected Flan as the LLM Model")
             os.environ['HUGGINGFACEHUB_API_TOKEN'] = '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'
@@ -36,10 +38,10 @@ class bardflanllm:
         formatted_json_string = json.dumps(json_data, indent=2)
         return formatted_json_string
 
-    def start_process(self, json_data, query):
+    def start_process(self, json_data, query, query_langauge):
 
         system_instruction = """
-            you are a text-to-SQL translator.
+            you are a text-to-{query_langauge} translator.
             You are a helpful, respectful and honest assistant. Always answer as helpfully as possible. 
             Please ensure that your responses are socially unbiased and positive in nature.
             If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. 
@@ -47,9 +49,9 @@ class bardflanllm:
         """
         main_prompt_template = """
             Using the below schema: {schema}, 
-            Write an SQL server query for the following text: 
+            Write an {query_langauge} server query for the following text: 
             ```{query}```
-            NOTE: Pay attention to the syntax to generate error free queries for example do not use any SQL reserved keywords as alias.
+            NOTE: Pay attention to the syntax to generate error free queries for example do not use any {query_langauge} reserved keywords as alias.
         """
 
         prompt = ChatPromptTemplate.from_messages([
@@ -64,7 +66,7 @@ class bardflanllm:
 
         schema_json_str = self.parse_json_schema(json_data)
         chain = prompt | self.llm
-        response = chain.invoke({"schema": schema_json_str, "query": query})
+        response = chain.invoke({"schema": schema_json_str, "query": query, "query_langauge":query_langauge})
 
         # time.sleep(1)
         # try:
