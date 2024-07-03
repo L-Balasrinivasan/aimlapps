@@ -36,6 +36,28 @@ from .llama2_class_v1 import llama_nl2sql
 from .gemini_class_v1 import Geminillm
 
 
+import cv2
+import numpy as np
+import tensorflow as tf
+from ultralytics import YOLO
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import FileResponse
+import tempfile
+import shutil
+
+from minio.error import S3Error
+from minio import Minio
+
+minio_client = Minio(
+    "play.min.io:9000",
+    access_key="2jybumxYvXx31nOiL46q",
+    secret_key="djNzRtNPCmBwtg6Z9bazQ1SG4uDOdCuG2MkKOhBU",
+    secure=True
+    
+)
+
+
+
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -624,8 +646,16 @@ row_limit = None
 
 import json
     
-@router.post("/sql_query/")
-async def get_sql_query(schema_option: str = None, user_query: str = None, model_selection: str = "bard", uploaded_file: UploadFile = File(None),language: str = "SQL",row_limit: int=100):
+@router.post("/sql_query")
+async def get_sql_query(
+    schema_option: str = None,
+    user_query: str = None,
+    model_selection: str = "bard",
+    uploaded_file: UploadFile = File(None),
+    language: str = "SQL",
+    row_limit: int = 100,
+):
+    print(schema_option)
     global obj, json_data
     # ,user_query,model_selection,language, row_limit
 
@@ -660,30 +690,32 @@ async def get_sql_query(schema_option: str = None, user_query: str = None, model
 
     # Translate the query
     result = obj.start_process(json_data, user_query,language)
-    if result and isinstance(result, str):
+    print(result)
+    return result
+    # if result and isinstance(result, str):
         
-        # Strip any non-QL content such as markdown backticks
-        clean_result = result.replace('```', '').strip()
-        lower_version_query_language = language.lower()
-        clean_result = clean_result.replace(lower_version_query_language, '').strip()
-        clean_result = clean_result.replace(";", "")
-        if row_limit == "":
-            default_row_limit=100
-            clean_result = clean_result + " LIMIT " + str(default_row_limit)
-        else:
-            clean_result = clean_result + " LIMIT " + str(row_limit)
-        if schema_option == "default" and language == "SQL":
-            # Execute the SQL query and return results
-            query_result, description = execute_query(clean_result)
-            if query_result and description:
-                df = pd.DataFrame(query_result, columns=[column[0] for column in description])
-                return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
-            else:
-                return {"sql_query": clean_result, "result": "No data found or query error."}
-        else:
-            return {"sql_query": clean_result}
-    else:
-        raise HTTPException(status_code=500, detail="Error translating query")
+    #     # Strip any non-QL content such as markdown backticks
+    #     clean_result = result.replace('```', '').strip()
+    #     lower_version_query_language = language.lower()
+    #     clean_result = clean_result.replace(lower_version_query_language, '').strip()
+    #     clean_result = clean_result.replace(";", "")
+    #     if row_limit == "":
+    #         default_row_limit=100
+    #         clean_result = clean_result + " LIMIT " + str(default_row_limit)
+    #     else:
+    #         clean_result = clean_result + " LIMIT " + str(row_limit)
+    #     if schema_option == "default" and language == "SQL":
+    #         # Execute the SQL query and return results
+    #         query_result, description = execute_query(clean_result)
+    #         if query_result and description:
+    #             df = pd.DataFrame(query_result, columns=[column[0] for column in description])
+    #             return {"sql_query": clean_result, "result": df.to_dict(orient="records")}
+    #         else:
+    #             return {"sql_query": clean_result, "result": "No data found or query error."}
+    #     else:
+    #         return {"sql_query": clean_result}
+    # else:
+    #     raise HTTPException(status_code=500, detail="Error translating query")
     
 from fastapi.responses import StreamingResponse
 from PIL import Image
@@ -716,6 +748,237 @@ async def get_image():
         # If something goes wrong, return an error
         raise HTTPException(status_code=500, detail=str(e))
     
+
+
+
+
+import cv2
+import numpy as np
+import tensorflow as tf
+from ultralytics import YOLO
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import FileResponse
+import tempfile
+import shutil
+import os
+
+# # Initialize FastAPI app
+# app = FastAPI()
+
+# Initialize YOLO model
+model_yolo = YOLO('yolov8n.pt')
+
+# Load ResNet50 model for animal classification
+model_resnet = tf.keras.models.load_model('final_animal_classifier_model.keras')
+
+# List of animals to detect
+animals = ["dog", "cat"]
+
+# Dog classes for classification
+dog_classes = ["golden_retriever", "labrador"]
+
+# Assign colors for different classes
+colors = {
+    "golden_retriever": (0, 0, 255),  # Red
+    "labrador": (255, 0, 0),  # Blue
+    "dog": (0, 255, 0),  # Green for unclassified dogs
+    "cat": (0, 255, 255),  # Cyan for unclassified cats
+    "orange_cat": (255, 0, 0),  # Red for orange cat
+    "unknown": (128, 128, 128)  # Gray for unknown animals
+}
+
+def preprocess_image(image, input_shape=(224, 224)):
+    image = cv2.resize(image, input_shape)
+    image = image.astype('float32') / 255.0  # Normalize image
+    return image
+
+def classify_animal(animal_image, animal_classes):
+    img = preprocess_image(animal_image)
+    img = np.expand_dims(img, axis=0)  # Add batch dimension
+    predictions = model_resnet.predict(img)
+    class_index = np.argmax(predictions)
+    predicted_class = animal_classes[class_index] if class_index < len(animal_classes) and np.max(predictions) >= 0.3 else "unknown"
+    confidence = np.max(predictions)
+    return predicted_class, confidence
+
+def process_video(input_video_path, output_video_path):
+    try:
+        cap = cv2.VideoCapture(input_video_path)
+        if not cap.isOpened():
+            print(f"Error opening video file: {input_video_path}")
+            return False
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+
+        frame_count = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            results = model_yolo(frame)[0]
+            for result in results:
+                boxes = result.boxes.xyxy
+                class_ids = result.boxes.cls
+                confidences = result.boxes.conf
+
+                for box, class_id, confidence in zip(boxes, class_ids, confidences):
+                    class_name = model_yolo.names[int(class_id)]
+                    if class_name in animals:
+                        x1, y1, x2, y2 = map(int, box)
+                        animal_image = frame[y1:y2, x1:x2]
+                        if animal_image.size == 0:
+                            continue
+
+                        if class_name == "dog":
+                            predicted_class, class_confidence = classify_animal(animal_image, dog_classes)
+                        elif class_name == "cat":
+                            predicted_class, class_confidence = classify_animal(animal_image, ["orange_cat"])
+                            orange_cat_threshold = 0.5  # Define a threshold for orange_cat
+                            if predicted_class == "orange_cat" and class_confidence < orange_cat_threshold:
+                                predicted_class = "cat"
+                                class_confidence = 1.0  # Assign a default confidence for general cat
+                            elif predicted_class != "orange_cat":
+                                predicted_class = "cat"
+                                class_confidence = 1.0  # Assign a default confidence for general cat
+
+                        color = colors.get(predicted_class, (0, 255, 255))  # Default cyan for unclassified
+                        if predicted_class in ["orange_cat"]:
+                            color = colors[predicted_class]
+
+                        # Draw bounding box with thicker border and background
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
+                        # Prepare text with class and confidence
+                        text = f"{predicted_class} {class_confidence:.2f}"
+                        # Calculate text size to determine text position
+                        (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.75, 2)
+                        # Draw filled background rectangle for text
+                        cv2.rectangle(frame, (x1, y1 - text_height - 10), (x1 + text_width, y1), color, -1)
+                        # Draw text on top of filled rectangle
+                        cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                    else:
+                        # Unknown animal detected
+                        x1, y1, x2, y2 = map(int, box)
+                        color = colors["unknown"]
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
+                        text = "unknown"
+                        (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.75, 2)
+                        cv2.rectangle(frame, (x1, y1 - text_height - 10), (x1 + text_width, y1), color, -1)
+                        cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+
+            out.write(frame)
+            frame_count += 1
+            print(f"Processed frame {frame_count}/{total_frames}")
+
+        cap.release()
+        out.release()
+        return True
+    except Exception as e:
+        print(f"Error processing video: {e}")
+        return False
+
+# @router.post("/process-video/")
+# async def process_video_endpoint(file: UploadFile = File(...)):
+#     try:
+#         # Create a temporary file to save the uploaded video
+#         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_input_video:
+#             shutil.copyfileobj(file.file, temp_input_video)
+#             input_video_path = temp_input_video.name
+
+#         # Create a temporary file to save the processed video
+#         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_output_video:
+#             output_video_path = temp_output_video.name
+
+#         # Process the video
+#         if not process_video(input_video_path, output_video_path):
+#             raise HTTPException(status_code=500, detail="Error processing video")
+
+#         # Return the processed video as a file response
+#         return FileResponse(output_video_path, media_type="video/mp4", filename="processed_video.mp4")
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/process-video/")
+async def process_video_endpoint(file: UploadFile = File(...)):
+    try:
+        # Create a temporary file to save the uploaded video
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_input_video:
+            shutil.copyfileobj(file.file, temp_input_video)
+            input_video_path = temp_input_video.name
+
+        # Process the video
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_output_video:
+            output_video_path = temp_output_video.name
+            if not process_video(input_video_path, output_video_path):
+                raise HTTPException(status_code=500, detail="Error processing video")
+
+        # Upload processed video to MinIO
+        bucket_name = "animaldetect"
+        object_name = os.path.basename(output_video_path)
+
+        try:
+            minio_client.fput_object(
+                bucket_name, object_name, output_video_path, content_type="video/mp4"
+            )
+        except S3Error as e:
+            raise HTTPException(status_code=500, detail=f"MinIO error: {str(e)}")
+
+        # Create a presigned URL to download the file
+        presigned_url = minio_client.presigned_get_object(bucket_name, object_name)
+
+        # Return the presigned URL to the client
+        return {"url": presigned_url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @router.post("/clear_all/")

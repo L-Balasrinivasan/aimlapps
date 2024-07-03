@@ -24,3 +24,10 @@ Pillow==9.5.0
 python-dotenv==1.0.0
 torchvision==0.15.2
 tqdm==4.66.1
+#yolo
+opencv-python-headless==4.10.0.82
+keras==3.3.3
+tensorflow==2.16.1
+tensorflow-intel==2.16.1
+ultralytics==8.2.30
+minio
