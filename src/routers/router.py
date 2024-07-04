@@ -1,6 +1,7 @@
 import os
 import io
 import torch
+from datetime import timedelta
 import openai
 import uvicorn
 from PIL import Image
@@ -47,12 +48,30 @@ import shutil
 
 from minio.error import S3Error
 from minio import Minio
+import urllib3
+
+
+timeout = timedelta(minutes=5).seconds
+
+http_client = urllib3.PoolManager(
+    timeout=urllib3.util.Timeout(connect=timeout, read=timeout),
+            maxsize=10,
+            cert_reqs='CERT_NONE',
+            assert_hostname=False,
+            retries=urllib3.Retry(
+                total=5,
+                backoff_factor=0.2,
+                status_forcelist=[500, 502, 503, 504]
+      )
+)
+
+
 
 minio_client = Minio(
-    "play.min.io:9000",
-    access_key="2jybumxYvXx31nOiL46q",
-    secret_key="djNzRtNPCmBwtg6Z9bazQ1SG4uDOdCuG2MkKOhBU",
-    secure=True
+    "emindsobjectstorage.ddns.net:443",
+    access_key="GxsrswtHkG3jbmVL7qPJ",
+    secret_key="xP8TXvrydl0y7a4bu2eiKxnxcswLIyGYA04G1ksx",
+    secure=False
     
 )
 
@@ -905,42 +924,65 @@ def process_video(input_video_path, output_video_path):
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
+# minio_client = Minio(
+#     "play.min.io:9000",
+#     access_key="2jybumxYvXx31nOiL46q",
+#     secret_key="djNzRtNPCmBwtg6Z9bazQ1SG4uDOdCuG2MkKOhBU",
+#     secure=True
+# )
 
+def process_video_from_minio(minio_client, bucket_name, object_name, output_video_path):
+    try:
+        # Download input video from MinIO
+        minio_client.fget_object(bucket_name, object_name, output_video_path)
 
+        # Process the video (for example, using your existing function)
+        # process_video(input_video_path, output_video_path)
+
+        return True
+    except S3Error as e:
+        print(f"MinIO download error: {str(e)}")
+        return False
 @router.post("/process-video/")
 async def process_video_endpoint(file: UploadFile = File(...)):
     try:
-        # Create a temporary file to save the uploaded video
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_input_video:
-            shutil.copyfileobj(file.file, temp_input_video)
-            input_video_path = temp_input_video.name
-
-        # Process the video
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_output_video:
-            output_video_path = temp_output_video.name
-            if not process_video(input_video_path, output_video_path):
-                raise HTTPException(status_code=500, detail="Error processing video")
-
-        # Upload processed video to MinIO
+        # Upload input video directly to MinIO
         bucket_name = "animaldetect"
-        object_name = os.path.basename(output_video_path)
+        object_name = file.filename
+        input_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
+        
+        with open(input_video_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
         try:
             minio_client.fput_object(
-                bucket_name, object_name, output_video_path, content_type="video/mp4"
+                bucket_name, object_name, input_video_path, content_type="video/mp4"
             )
         except S3Error as e:
-            raise HTTPException(status_code=500, detail=f"MinIO error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
 
-        # Create a presigned URL to download the file
-        presigned_url = minio_client.presigned_get_object(bucket_name, object_name)
+        # Process the video (retrieve from MinIO)
+        output_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
+        if not process_video(input_video_path, output_video_path):
+            raise HTTPException(status_code=500, detail="Error processing video")
+
+        # Upload processed video to MinIO
+        processed_object_name = f"processed_{object_name}"
+        try:
+            minio_client.fput_object(
+                bucket_name, processed_object_name, output_video_path, content_type="application/octet-stream"
+            )
+        except S3Error as e:
+            raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
+
+        # Create a presigned URL to download the processed file
+        presigned_url = minio_client.presigned_get_object(bucket_name, processed_object_name, expires=timedelta(hours=1))
 
         # Return the presigned URL to the client
         return {"url": presigned_url}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 

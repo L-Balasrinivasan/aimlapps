@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.routers.router import router as ai_router
 
-app = FastAPI(title="DT Framework", debug=True)
+app = FastAPI(title="AI/ML Demo ", debug=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,4 +20,4 @@ async def _home_for_api_check():
 app.include_router(ai_router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)
