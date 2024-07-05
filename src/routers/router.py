@@ -57,7 +57,7 @@ http_client = urllib3.PoolManager(
     timeout=urllib3.util.Timeout(connect=timeout, read=timeout),
             maxsize=10,
             cert_reqs='CERT_NONE',
-            assert_hostname=False,
+            # assert_hostname=False,
             retries=urllib3.Retry(
                 total=5,
                 backoff_factor=0.2,
@@ -67,13 +67,14 @@ http_client = urllib3.PoolManager(
 
 
 
-minio_client = Minio(
-    "emindsobjectstorage.ddns.net:443",
-    access_key="GxsrswtHkG3jbmVL7qPJ",
-    secret_key="xP8TXvrydl0y7a4bu2eiKxnxcswLIyGYA04G1ksx",
-    secure=False
+# minio_client = Minio(
+#     "emindsobjectstorage.ddns.net:443",
+#     access_key="GxsrswtHkG3jbmVL7qPJ",
+#     secret_key="xP8TXvrydl0y7a4bu2eiKxnxcswLIyGYA04G1ksx",
+#     secure=False,
+#     http_client=http_client
     
-)
+# )
 
 
 
@@ -820,11 +821,20 @@ def classify_animal(animal_image, animal_classes):
     confidence = np.max(predictions)
     return predicted_class, confidence
 
-def process_video(input_video_path, output_video_path):
+import cv2
+import tempfile
+
+def process_video(input_buffer, output_buffer):
+    print("started!!!!!!!")
     try:
-        cap = cv2.VideoCapture(input_video_path)
+        # Write input buffer to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_input_file:
+            temp_input_file.write(input_buffer.read())
+            input_file_path = temp_input_file.name
+
+        cap = cv2.VideoCapture(input_file_path)
         if not cap.isOpened():
-            print(f"Error opening video file: {input_video_path}")
+            print("Error opening video file")
             return False
         
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -832,8 +842,12 @@ def process_video(input_video_path, output_video_path):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+        # Write output buffer to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_output_file:
+            output_file_path = temp_output_file.name
+
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(output_file_path, fourcc, fps, (width, height))
 
         frame_count = 0
         while cap.isOpened():
@@ -859,30 +873,24 @@ def process_video(input_video_path, output_video_path):
                             predicted_class, class_confidence = classify_animal(animal_image, dog_classes)
                         elif class_name == "cat":
                             predicted_class, class_confidence = classify_animal(animal_image, ["orange_cat"])
-                            orange_cat_threshold = 0.5  # Define a threshold for orange_cat
+                            orange_cat_threshold = 0.5
                             if predicted_class == "orange_cat" and class_confidence < orange_cat_threshold:
                                 predicted_class = "cat"
-                                class_confidence = 1.0  # Assign a default confidence for general cat
+                                class_confidence = 1.0
                             elif predicted_class != "orange_cat":
                                 predicted_class = "cat"
-                                class_confidence = 1.0  # Assign a default confidence for general cat
+                                class_confidence = 1.0
 
-                        color = colors.get(predicted_class, (0, 255, 255))  # Default cyan for unclassified
+                        color = colors.get(predicted_class, (0, 255, 255))
                         if predicted_class in ["orange_cat"]:
                             color = colors[predicted_class]
 
-                        # Draw bounding box with thicker border and background
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
-                        # Prepare text with class and confidence
                         text = f"{predicted_class} {class_confidence:.2f}"
-                        # Calculate text size to determine text position
                         (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.75, 2)
-                        # Draw filled background rectangle for text
                         cv2.rectangle(frame, (x1, y1 - text_height - 10), (x1 + text_width, y1), color, -1)
-                        # Draw text on top of filled rectangle
                         cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
                     else:
-                        # Unknown animal detected
                         x1, y1, x2, y2 = map(int, box)
                         color = colors["unknown"]
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
@@ -897,10 +905,16 @@ def process_video(input_video_path, output_video_path):
 
         cap.release()
         out.release()
+
+        # Read the processed video into output buffer
+        with open(output_file_path, 'rb') as f:
+            output_buffer.write(f.read())
+
         return True
     except Exception as e:
         print(f"Error processing video: {e}")
         return False
+
 
 # @router.post("/process-video/")
 # async def process_video_endpoint(file: UploadFile = File(...)):
@@ -924,12 +938,12 @@ def process_video(input_video_path, output_video_path):
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
-# minio_client = Minio(
-#     "play.min.io:9000",
-#     access_key="2jybumxYvXx31nOiL46q",
-#     secret_key="djNzRtNPCmBwtg6Z9bazQ1SG4uDOdCuG2MkKOhBU",
-#     secure=True
-# )
+minio_client = Minio(
+    "play.min.io:9000",
+    access_key="2jybumxYvXx31nOiL46q",
+    secret_key="djNzRtNPCmBwtg6Z9bazQ1SG4uDOdCuG2MkKOhBU",
+    secure=True
+)
 
 def process_video_from_minio(minio_client, bucket_name, object_name, output_video_path):
     try:
@@ -943,82 +957,167 @@ def process_video_from_minio(minio_client, bucket_name, object_name, output_vide
     except S3Error as e:
         print(f"MinIO download error: {str(e)}")
         return False
+# @router.post("/process-video/")
+# async def process_video_endpoint(file: UploadFile = File(...)):
+#     try:
+#         # Upload input video directly to MinIO
+#         bucket_name = "animaldetect"
+#         object_name = file.filename
+#         input_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
+        
+#         with open(input_video_path, "wb") as f:
+#             shutil.copyfileobj(file.file, f)
+
+#         try:
+#             minio_client.fput_object(
+#                 bucket_name, object_name, input_video_path, content_type="video/mp4"
+#             )
+#         except S3Error as e:
+#             raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
+
+#         # Process the video (retrieve from MinIO)
+#         output_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
+        
+#         if not process_video(input_video_path, output_video_path):
+#             raise HTTPException(status_code=500, detail="Error processing video")
+
+#         # Upload processed video to MinIO
+#         processed_object_name = f"processed_{object_name}"
+#         try:
+#             minio_client.fput_object(
+#                 bucket_name, processed_object_name, output_video_path, content_type="application/octet-stream"
+#             )
+#         except S3Error as e:
+#             raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
+
+#         # Create a presigned URL to download the processed file
+#         presigned_url = minio_client.presigned_get_object(bucket_name, processed_object_name, expires=timedelta(hours=1))
+#         input_url=minio_client.presigned_get_object(bucket_name,input_video_path,expires=timedelta(hours=1))
+        
+#         # Return the presigned URL to the client
+#         return {"url": input_url}
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+import requests
+import subprocess
+
+def save_processed_video(content, filename):
+    download_folder = "download_video"
+    os.makedirs(download_folder, exist_ok=True)
+    filepath = os.path.join(download_folder, filename)
+    with open(filepath, "wb") as f:
+        f.write(content)
+    return filepath
+import moviepy.editor as moviepy
+def convert_to_mp4(input_file):
+    
+    
+    clip = moviepy.VideoFileClip(input_file)
+    clip.write_videofile("download_video/myvideo.mp4")
+
 @router.post("/process-video/")
 async def process_video_endpoint(file: UploadFile = File(...)):
     try:
-        # Upload input video directly to MinIO
+        # Read the uploaded file into an in-memory buffer
+        input_buffer = io.BytesIO()
+        shutil.copyfileobj(file.file, input_buffer)
+        input_buffer.seek(0)  # Reset buffer position to the beginning
+
         bucket_name = "animaldetect"
         object_name = file.filename
-        input_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
-        
-        with open(input_video_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
 
+        # Upload the input video to MinIO
         try:
-            minio_client.fput_object(
-                bucket_name, object_name, input_video_path, content_type="video/mp4"
+            input_buffer.seek(0)
+            minio_client.put_object(
+                bucket_name, object_name, input_buffer, length=-1, part_size=10*1024*1024, content_type="video/mp4"
             )
         except S3Error as e:
             raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
 
-        # Process the video (retrieve from MinIO)
-        output_video_path = tempfile.NamedTemporaryFile(suffix=".mp4").name
-        if not process_video(input_video_path, output_video_path):
-            raise HTTPException(status_code=500, detail="Error processing video")
+        # Prepare an in-memory buffer for the processed video
+        output_buffer = io.BytesIO()
 
-        # Upload processed video to MinIO
+        # Process the video
+        input_buffer.seek(0)
+        process_video(input_buffer, output_buffer)
+        output_buffer.seek(0)
+
+        # Upload the processed video to MinIO
         processed_object_name = f"processed_{object_name}"
         try:
-            minio_client.fput_object(
-                bucket_name, processed_object_name, output_video_path, content_type="application/octet-stream"
+            output_buffer.seek(0)
+            minio_client.put_object(
+                bucket_name, processed_object_name, output_buffer, length=-1, part_size=10*1024*1024, content_type="video/mp4"
             )
         except S3Error as e:
             raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
 
         # Create a presigned URL to download the processed file
         presigned_url = minio_client.presigned_get_object(bucket_name, processed_object_name, expires=timedelta(hours=1))
+        processed_response = requests.get(presigned_url)
+        
+        if processed_response.status_code == 200:
+            # Save the downloaded video to a file in the download_video folder
+            filename = "processed_video.mp4"
+            filepath = save_processed_video(processed_response.content, filename)
+            
+            print(filepath)
+            
+            # Convert the saved video to MP4 format
 
-        # Return the presigned URL to the client
-        return {"url": presigned_url}
+            if os.path.isfile(filepath):
+                try:
+                    convert_to_mp4(filepath)
+                except Exception as e:
+                    print(f"Conversion to MP4 failed: {str(e)}")
+            else:
+                print(f"File '{filepath}' not found. Cannot convert to MP4.")
+        converted_object_name = f"processed_convert_{object_name}"
+        object_name_out=r"download_video\myvideo.mp4"
+        # Open the video file and prepare it for upload
+        with open(object_name_out, 'rb') as file:
+            # Create a BytesIO buffer and copy file contents into it
+            input_buffer = io.BytesIO()
+            shutil.copyfileobj(file, input_buffer)
+            input_buffer.seek(0)  # Reset buffer position to the beginning
+
+            try:
+                # Upload the file to MinIO bucket
+                minio_client.put_object(
+                    bucket_name,
+                    converted_object_name,
+                    input_buffer,
+                    length=input_buffer.getbuffer().nbytes,
+                    content_type="video/mp4"
+                )
+                print(f"File '{object_name}' uploaded successfully to bucket '{bucket_name}' as '{processed_object_name}'.")
+            except S3Error as e:
+                print(f"MinIO upload error: {str(e)}")
+
+        presigned_out_url = minio_client.presigned_get_object(bucket_name, converted_object_name, expires=timedelta(hours=1))
+        # Create a presigned URL to download the input file (optional)
+        input_presigned_url = minio_client.presigned_get_object(bucket_name, object_name, expires=timedelta(hours=1))
+        
+        # Delete the processed video file after upload
+        if os.path.isfile(filepath):
+            os.remove(filepath)
+            print(f"Deleted processed video file: {filepath}")
+        else:
+            print(f"Processed video file '{filepath}' not found. Deletion skipped.")
+        filepathout=object_name_out
+        if os.path.isfile(filepathout):
+            os.remove(filepathout)
+            print(f"Deleted processed video file: {filepathout}")
+        else:
+            print(f"Processed video file '{filepathout}' not found. Deletion skipped.")
+        
+        # Return the presigned URLs to the client
+        return {"input_url": input_presigned_url, "processed_url": presigned_out_url}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
