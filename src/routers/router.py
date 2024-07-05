@@ -71,7 +71,7 @@ minio_client = Minio(
     "emindsobjectstorage.ddns.net:443",
     access_key="GxsrswtHkG3jbmVL7qPJ",
     secret_key="xP8TXvrydl0y7a4bu2eiKxnxcswLIyGYA04G1ksx",
-    secure=False,
+    secure=True,
     http_client=http_client
     
 )
@@ -372,6 +372,13 @@ async def identify_locations(sentence_input: SentenceInput):
 model = SentenceTransformer('clip-ViT-B-32')
 
 
+# PAYLOAD_PATH = Path(r"/home/eminds/emaiapp/ai-backend/src/payloads")
+# ANN_INDEX_PATH = PAYLOAD_PATH / "models/ann.ann"
+# TRAIN_INDEX_FILEPATH = PAYLOAD_PATH / "metadata/train_index.json"
+# EMBEDDING_SIZE = 512
+# DISTANCE_TYPE = "angular"
+# N_SEARCH = 1
+# INCLUDE_DISTANCES = True
 PAYLOAD_PATH = Path(r"C:\Ai-product\ai-backend\src\payloads")
 ANN_INDEX_PATH = PAYLOAD_PATH / "models/ann.ann"
 TRAIN_INDEX_FILEPATH = PAYLOAD_PATH / "metadata/train_index.json"
@@ -799,12 +806,12 @@ dog_classes = ["golden_retriever", "labrador"]
 
 # Assign colors for different classes
 colors = {
-    "golden_retriever": (0, 0, 255),  # Red
-    "labrador": (255, 0, 0),  # Blue
-    "dog": (0, 255, 0),  # Green for unclassified dogs
-    "cat": (0, 255, 255),  # Cyan for unclassified cats
-    "orange_cat": (255, 0, 0),  # Red for orange cat
-    "unknown": (128, 128, 128)  # Gray for unknown animals
+    "golden_retriever": (0, 0, 255),   # Red
+    "labrador": (255, 0, 0),           # Blue
+    "dog": (138, 43, 226),             # Violet
+    "cat": (255, 0, 0),                # Blue
+    "orange_cat": (0, 0, 255),         # Red
+    "unknown": (0, 100, 0)             # Dark Green
 }
 
 def preprocess_image(image, input_shape=(224, 224)):
@@ -817,8 +824,8 @@ def classify_animal(animal_image, animal_classes):
     img = np.expand_dims(img, axis=0)  # Add batch dimension
     predictions = model_resnet.predict(img)
     class_index = np.argmax(predictions)
-    predicted_class = animal_classes[class_index] if class_index < len(animal_classes) and np.max(predictions) >= 0.3 else "unknown"
     confidence = np.max(predictions)
+    predicted_class = animal_classes[class_index] if class_index < len(animal_classes) else "unknown"
     return predicted_class, confidence
 
 import cv2
@@ -871,18 +878,26 @@ def process_video(input_buffer, output_buffer):
 
                         if class_name == "dog":
                             predicted_class, class_confidence = classify_animal(animal_image, dog_classes)
+                            golden_retriever_threshold = 0.5  # Define a threshold for golden retriever
+                            if predicted_class == "golden_retriever" and class_confidence < golden_retriever_threshold:
+                                predicted_class = "dog"
+                                class_confidence = 1.0  # Assign a default confidence for general dog
+                            elif predicted_class != "golden_retriever":
+                                predicted_class = "dog"
+                                class_confidence = 1.0  # Assign a default confidence for general dog
+
                         elif class_name == "cat":
                             predicted_class, class_confidence = classify_animal(animal_image, ["orange_cat"])
-                            orange_cat_threshold = 0.5
+                            orange_cat_threshold = 0.5  # Define a threshold for orange cat
                             if predicted_class == "orange_cat" and class_confidence < orange_cat_threshold:
                                 predicted_class = "cat"
-                                class_confidence = 1.0
+                                class_confidence = 1.0  # Assign a default confidence for general cat
                             elif predicted_class != "orange_cat":
                                 predicted_class = "cat"
-                                class_confidence = 1.0
+                                class_confidence = 1.0  # Assign a default confidence for general cat
 
-                        color = colors.get(predicted_class, (0, 255, 255))
-                        if predicted_class in ["orange_cat"]:
+                        color = colors.get(predicted_class, (0, 255, 255))  # Default cyan for unclassified
+                        if predicted_class in ["orange_cat", "golden_retriever"]:
                             color = colors[predicted_class]
 
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
@@ -936,22 +951,25 @@ def process_video_from_minio(minio_client, bucket_name, object_name, output_vide
     except S3Error as e:
         print(f"MinIO download error: {str(e)}")
         return False
-    
+import moviepy.editor as moviepy
 import subprocess
 
+# Directory for saving downloaded and processed videos
+download_folder = "/home/eminds/emaiapp/ai-backend/src/routers/download_video"
+# download_folder=r"C:\Ai-product\ai-backend\src\routers\download_video"
+os.makedirs(download_folder, exist_ok=True)
+
 def save_processed_video(content, filename):
-    download_folder = "download_video"
-    os.makedirs(download_folder, exist_ok=True)
     filepath = os.path.join(download_folder, filename)
     with open(filepath, "wb") as f:
         f.write(content)
     return filepath
-import moviepy.editor as moviepy
+
 def convert_to_mp4(input_file):
-    
-    
     clip = moviepy.VideoFileClip(input_file)
-    clip.write_videofile("download_video/myvideo.mp4")
+    output_path = os.path.join(download_folder, "myvideo.mp4")
+    clip.write_videofile(output_path)
+    return output_path
 
 @router.post("/process-video/")
 async def process_video_endpoint(file: UploadFile = File(...)):
@@ -961,7 +979,7 @@ async def process_video_endpoint(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, input_buffer)
         input_buffer.seek(0)  # Reset buffer position to the beginning
 
-        bucket_name = "animaldetect"
+        bucket_name = "animaldetection"
         object_name = file.filename
 
         # Upload the input video to MinIO
@@ -993,71 +1011,62 @@ async def process_video_endpoint(file: UploadFile = File(...)):
 
         # Create a presigned URL to download the processed file
         presigned_url = minio_client.presigned_get_object(bucket_name, processed_object_name, expires=timedelta(hours=1))
-        processed_response = requests.get(presigned_url)
-        
+        processed_response = requests.get(presigned_url,verify=False)
+
         if processed_response.status_code == 200:
             # Save the downloaded video to a file in the download_video folder
             filename = "processed_video.mp4"
             filepath = save_processed_video(processed_response.content, filename)
-            
-            print(filepath)
-            
-            # Convert the saved video to MP4 format
 
+            print(filepath)
+
+            # Convert the saved video to MP4 format
             if os.path.isfile(filepath):
                 try:
-                    convert_to_mp4(filepath)
+                    converted_file = convert_to_mp4(filepath)
                 except Exception as e:
                     print(f"Conversion to MP4 failed: {str(e)}")
             else:
                 print(f"File '{filepath}' not found. Cannot convert to MP4.")
+        else:
+            raise HTTPException(status_code=500, detail="Failed to download the processed video.")
+
+        # Upload the converted video to MinIO
         converted_object_name = f"processed_convert_{object_name}"
-        object_name_out=r"download_video\myvideo.mp4"
-        # Open the video file and prepare it for upload
-        with open(object_name_out, 'rb') as file:
-            # Create a BytesIO buffer and copy file contents into it
+        with open(converted_file, 'rb') as file:
             input_buffer = io.BytesIO()
             shutil.copyfileobj(file, input_buffer)
             input_buffer.seek(0)  # Reset buffer position to the beginning
 
             try:
-                # Upload the file to MinIO bucket
                 minio_client.put_object(
                     bucket_name,
                     converted_object_name,
                     input_buffer,
-                    length=input_buffer.getbuffer().nbytes,
+                    length=-1, part_size=10*1024*1024,
                     content_type="video/mp4"
                 )
                 print(f"File '{object_name}' uploaded successfully to bucket '{bucket_name}' as '{processed_object_name}'.")
             except S3Error as e:
-                print(f"MinIO upload error: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"MinIO upload error: {str(e)}")
 
         presigned_out_url = minio_client.presigned_get_object(bucket_name, converted_object_name, expires=timedelta(hours=1))
-        # Create a presigned URL to download the input file (optional)
         input_presigned_url = minio_client.presigned_get_object(bucket_name, object_name, expires=timedelta(hours=1))
-        
-        # Delete the processed video file after upload
+
+        # Clean up temporary files
         if os.path.isfile(filepath):
             os.remove(filepath)
             print(f"Deleted processed video file: {filepath}")
-        else:
-            print(f"Processed video file '{filepath}' not found. Deletion skipped.")
-        filepathout=object_name_out
-        if os.path.isfile(filepathout):
-            os.remove(filepathout)
-            print(f"Deleted processed video file: {filepathout}")
-        else:
-            print(f"Processed video file '{filepathout}' not found. Deletion skipped.")
-        
+
+        if os.path.isfile(converted_file):
+            os.remove(converted_file)
+            print(f"Deleted converted video file: {converted_file}")
+
         # Return the presigned URLs to the client
-        return {"input_url": input_presigned_url, "processed_url": presigned_out_url}
+        return {"url": presigned_out_url}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
 
 @router.post("/clear_all/")
 async def clear_all():
