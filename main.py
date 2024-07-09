@@ -15,9 +15,9 @@ app.add_middleware(
 
 @app.get("/")
 async def _home_for_api_check():
-    return {"about": "app for QnA with website", "swagger_url": "http://127.0.0.1:8000/docs"}
+    return {"about": "AI/ML demo platform", "swagger_url": "http://127.0.0.1:5500/docs"}
 
 app.include_router(ai_router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=5500, reload=True)

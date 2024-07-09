@@ -11,7 +11,7 @@ import base64
 from pydantic import BaseModel
 import streamlit as st
 import spacy
-from fastapi import APIRouter, FastAPI, Form, UploadFile, File, HTTPException
+from fastapi import APIRouter, FastAPI, Form, UploadFile, File, HTTPException,status
 from geopy.geocoders import Nominatim
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sentence_transformers import SentenceTransformer, util
+
 from src import get_ann_pred, get_sim_image, load_index, load_json
 from pathlib import Path
 from src import FAISStype, analyze_sentiment, get_text_chunks, get_vectorstore
@@ -49,8 +50,8 @@ import shutil
 from minio.error import S3Error
 from minio import Minio
 import urllib3
-
-
+# import sys
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 timeout = timedelta(minutes=5).seconds
 
 http_client = urllib3.PoolManager(
@@ -1067,6 +1068,20 @@ async def process_video_endpoint(file: UploadFile = File(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+from recom.app import get_data
+@router.post("/recommendation")
+async def recommendation_system(asin_input: str = None):
+    
+    if not asin_input:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ASIN input is required")
+
+    result = get_data(asin_input)
+
+    if "Invalid ASIN" in result or "No recommendations available" in result:
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"success": False, "detail": result})
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True, "data": result})
 
 @router.post("/clear_all/")
 async def clear_all():
